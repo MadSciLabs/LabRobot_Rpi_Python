@@ -12,6 +12,46 @@ sys.path.append(spacebrew_path)
 import roboclaw
 from pySpacebrew.spacebrew import Spacebrew
 
+def press(event):
+
+    print('press', event.key)
+    sys.stdout.flush()
+
+    if event.key == 'i':
+
+    	_keySpeed += .05
+    	if _keySpeed > 1
+    		_keySpeed = 1
+
+    if event.key == 'k':
+
+    	_keySpeed -= .05
+    	if _keySpeed < -1
+    		_keySpeed = -1
+
+    if event.key == 'j':
+
+    	_keyTurn -= .05
+    	if _keyTurn < -1
+    		_keyTurn = -1
+
+    if event.key == 'l':
+
+    	_keyTurn += .05
+    	if _keyTurn > 1
+    		_keyTurn = 1
+
+    if _keyTurn < 0:
+
+		_valMotor[0] = _keySpeed * MOTOR_MAX
+		_valMotor[1] = (1-abs(_keyTurn)) * _keySpeed * MOTOR_MAX
+
+	else:
+
+		_valMotor[0] = (1-_keyTurn) * _keySpeed * MOTOR_MAX
+		_valMotor[1] = _keySpeed * MOTOR_MAX
+
+
 # get app name and server from query string
 name = "Lab Robot - Test Controls"
 _server = "192.168.1.143"; #sandbox.spacebrew.cc"
@@ -73,37 +113,56 @@ _alpha = 2
 _speed = _alpha
 _stage = 0
 
-try:
-	brew.start()
+_keySpeed = 0
+_keyTurn = 0
 
-	while(1):
+IS_KEYBOARD = true
 
-		#FOR BOTH MOTORS
-		for i in range(2):
-			_diff = _targetMotor[i] - _valMotor[i]
+if IS_KEYBOARD == true:
 
-			if abs(_diff) > _alpha:
+	#FOR BOTH MOTORS
+	for i in range(2):
+		if _valMotor[i] > 0:
+			roboclaw.ForwardM1(address,_valMotor[i])
+		else:
+			roboclaw.BackwardM1(address,abs(_valMotor[i]))
+
+else:
+
+	try:
+
+		brew.start()
+
+		while(1):
+
+			#FOR BOTH MOTORS
+			for i in range(2):
+				_diff = _targetMotor[i] - _valMotor[i]
+
+				if abs(_diff) > _alpha:
 			
-				if _diff > 0:
-					_valMotor[i] = _valMotor[i] + _alpha	
-				else:
-					_valMotor[i] = _valMotor[i] - _alpha	
+					if _diff > 0:
+						_valMotor[i] = _valMotor[i] + _alpha	
+					else:
+						_valMotor[i] = _valMotor[i] - _alpha	
 
-			print "tar " + str(i) + ": " + str(_targetMotor[i]) + " val : " + str(_valMotor[i])
+				print "tar " + str(i) + ": " + str(_targetMotor[i]) + " val : " + str(_valMotor[i])
 
-			if i == 0:
-				if _valMotor[i] > 0:
-		 			roboclaw.ForwardM1(address,_valMotor[i])
-				else:
-					roboclaw.BackwardM1(address,abs(_valMotor[i]))
+				if i == 0:
+					if _valMotor[i] > 0:
+		 				roboclaw.ForwardM1(address,_valMotor[i])
+					else:
+						roboclaw.BackwardM1(address,abs(_valMotor[i]))
 			else:
 				if _valMotor[i] > 0:
 		 			roboclaw.ForwardM2(address,_valMotor[i])
 				else:
 					roboclaw.BackwardM2(address,abs(_valMotor[i]))
 
-		time.sleep(.03)
+			time.sleep(.03)
 
-finally:
-	brew.stop()
+	finally:
+		brew.stop()
+
+
 
