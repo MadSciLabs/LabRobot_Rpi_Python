@@ -1,6 +1,15 @@
+
+
+import smbus
 import sys
 import time
 import curses
+
+# for RPI version 1, use "bus = smbus.SMBus(0)"
+bus = smbus.SMBus(1)
+
+# This is the address we setup in the Arduino Program
+address = 0x04
 
 from array import *
 
@@ -117,8 +126,18 @@ brew.addSubscriber("motorB", "range")
 MOTOR_MIN = 0
 MOTOR_MAX = 70
 
-ENABLE_MOTORS = True
+ENABLE_MOTORS = False
 
+#
+# Write To Arduino
+#
+def writeToArduino(val):
+
+  for character in str(val):
+    print character
+    bus.write_byte(address, ord(character))
+
+  return -1
 
 #for i in range(2):
 #	_valMotor[i] = 0
