@@ -1,3 +1,5 @@
+from socketIO_client import SocketIO, LoggingNamespace
+
 import sys
 import time
 import curses
@@ -10,8 +12,8 @@ roboclaw_path = '/home/pi/LAB_ROBOT/roboclaw_python'
 sys.path.append(roboclaw_path)
 sys.path.append(spacebrew_path)
 
-import roboclaw
-from pySpacebrew.spacebrew import Spacebrew
+#import roboclaw
+#from pySpacebrew.spacebrew import Spacebrew
 
 stdscr = curses.initscr()
 curses.cbreak()
@@ -23,6 +25,64 @@ _targetMotor = array('i',[0,0])
 
 _moveType = 0
 _running = True
+
+# CHANGE SERVER TO CORRECT
+socketIO = SocketIO('192.168.8.102', 5000, LoggingNamespace)
+
+def writeNumber(value):
+    bus.write_byte(address, value)
+    # bus.write_byte_data(address, 0, value)
+    return -1
+
+######################
+# Get control from socket
+########################
+def getStick1(*args):
+  
+  _v = "3" + str(args[0])
+
+  print _v
+  print int(_v)
+  writeNumber(int(_v))
+
+def getStick2(*args):
+  
+  _v = "1" + str(args[0])
+  writeNumber(int(_v))
+
+def getUp(*args):
+
+  initDir(0)
+  addSpeed(0,_speedAlpha)
+  addSpeed(1,_speedAlpha)
+  
+def getDown(*args):
+
+  initDir(0)
+  addSpeed(0,-_speedAlpha)
+  addSpeed(1,-_speedAlpha)
+  
+def getLeft(*args):
+
+  initDir(1)
+  addSpeed(0,-_speedAlpha)
+  addSpeed(1,_speedAlpha)
+  
+def getRight(*args):
+  
+  initDir(1)
+  addSpeed(0,_speedAlpha)
+  addSpeed(1,-_speedAlpha)
+
+def getTrayUp(*args):
+  
+  _v = "1001"
+  writeNumber(int(_v))
+
+def getTrayDown(*args):
+  
+  _v = "1002"
+  writeNumber(int(_v))
 
 def initDir(_tMoveType):
   
@@ -65,6 +125,18 @@ def main(stdscr):
   _keyTurn = 0.0
 
   stdscr.nodelay(1)
+
+  #Listen to the Socket
+  socketIO.on('stick1', getStick1) 
+  socketIO.on('stick2', getStick2) 
+  socketIO.on('buttonUp', getUp) 
+  socketIO.on('buttonDown', getDown) 
+  socketIO.on('buttonLeft', getLeft) 
+  socketIO.on('buttonRight', getRight) 
+  socketIO.on('buttonTrayUp', getTrayUp) 
+  socketIO.on('buttonTrayDown', getTrayDown) 
+
+  socketIO.wait()
 
   while True:
 	
@@ -109,15 +181,15 @@ name = "Lab Robot - Test Controls"
 _server = "192.168.1.143"; #sandbox.spacebrew.cc"
 
 # configure the spacebrew client
-brew = Spacebrew(name, server=_server)
+#brew = Spacebrew(name, server=_server)
 
-brew.addSubscriber("motorA", "range")
-brew.addSubscriber("motorB", "range")
+#brew.addSubscriber("motorA", "range")
+#brew.addSubscriber("motorB", "range")
 
 MOTOR_MIN = 0
 MOTOR_MAX = 70
 
-ENABLE_MOTORS = True
+ENABLE_MOTORS = False
 
 
 #for i in range(2):
@@ -153,8 +225,8 @@ def mapValues(in_val, in_from, in_to, out_from, out_to):
     return out_val
 
 # registering range handler method with appropriate subscription feed
-brew.subscribe("motorB", motor2)
-brew.subscribe("motorA", motor1)
+#brew.subscribe("motorB", motor2)
+#brew.subscribe("motorA", motor1)
 
 #Linux comport name
 if ENABLE_MOTORS == True:
