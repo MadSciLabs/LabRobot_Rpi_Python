@@ -1,9 +1,42 @@
 from socketIO_client import SocketIO, LoggingNamespace
 
 import asyncio
+from Tkinter import *
+import RPi.GPIO as GPIO
+import time
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(18, GPIO.OUT)
+
+pwm = GPIO.PWM(18, 100)
+pwm.start(5)
+
+def update(self, angle):
+  duty = float(angle) / 10.0 + 2.5
+  pwm.ChangeDutyCycle(duty)
+
+headAngle = 90
+
+import smbus
 import sys
 import time
 import curses
+
+#import RPi.GPIO as GPIO
+#GPIO.setmode(GPIO.BOARD)
+#GPIO.setup(11,GPIO.OUT)
+
+#pwm=GPIO.PWM(11,50)
+#pwm.start(5)
+
+#_duty = 1/18*(180) + 2
+#pwm.ChangeDutyCycle(_duty)
+
+# for RPI version 1, use "bus = smbus.SMBus(0)"
+bus = smbus.SMBus(1)
+
+# This is the address we setup in the Arduino Program
+address = 0x04
 
 from array import *
 
@@ -13,7 +46,7 @@ roboclaw_path = '/home/pi/LAB_ROBOT/roboclaw_python'
 sys.path.append(roboclaw_path)
 sys.path.append(spacebrew_path)
 
-#import roboclaw
+import roboclaw
 #from pySpacebrew.spacebrew import Spacebrew
 
 #stdscr = curses.initscr()
@@ -28,30 +61,47 @@ _moveType = 0
 _running = True
 _speedAlpha = 5
 
+moving = False
+
 # CHANGE SERVER TO CORRECT
 
 #Adam Home
-socketIO = SocketIO('192.168.8.101', 5000, LoggingNamespace)
+#socketIO = SocketIO('192.168.8.101', 5000, LoggingNamespace)
 
-def writeNumber(value):
-    bus.write_byte(address, value)
-    # bus.write_byte_data(address, 0, value)
-    return -1
+#Adam Lab
+socketIO = SocketIO('192.168.1.143', 5000, LoggingNamespace)
+
+# MOTOR VALUES
+_speedAlpha = 5
+
+def writeToArduino(val):
+
+  for character in str(val):
+    print(character)
+    bus.write_byte(address, ord(character))
+
+  return -1
 
 ######################
 # Get control from socket
 ########################
 def getStick1(*args):
-  
+ 
+  global moving 
   _v = "3" + str(args[0])
 
   print(_v)
   writeNumber(int(_v))
+ 
+  #if moving == False:
+  #  moving = True
+  #  writeToArduino(_v)
+  #  time.sleep(1)
 
 def getStick2(*args):
   
   _v = "1" + str(args[0])
-  writeNumber(int(_v))
+  writeNumber(_v)
 
 def getUp(*args):
 
@@ -84,12 +134,12 @@ def getRight(*args):
 def getTrayUp(*args):
   
   _v = "1001"
-  writeNumber(int(_v))
+  writeNumber(_v)
 
 def getTrayDown(*args):
   
   _v = "1002"
-  writeNumber(int(_v))
+  writeNumber(_v)
 
 def initDir(_tMoveType):
   
@@ -181,13 +231,21 @@ def motorLoop():
 name = "Lab Robot - Test Controls"
 #_server = "192.168.1.143"; #sandbox.spacebrew.cc"
 
-# configure the spacebrew client
-
 MOTOR_MIN = 0
 MOTOR_MAX = 70
 
-ENABLE_MOTORS = False
+ENABLE_MOTORS = True
 
+#
+# Write To Arduino
+#
+def writeToArduino(_val):
+
+  for character in str(_val):
+    print(character)
+    #bus.write_byte(address, ord(character))
+
+  return -1
 
 #for i in range(2):
 #	_valMotor[i] = 0
