@@ -1,9 +1,35 @@
+from socketIO_client import SocketIO, LoggingNamespace
 
+from Tkinter import *
+import RPi.GPIO as GPIO
+import time
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(18, GPIO.OUT)
+
+pwm = GPIO.PWM(18, 100)
+pwm.start(5)
+
+def update(self, angle):
+  duty = float(angle) / 10.0 + 2.5
+  pwm.ChangeDutyCycle(duty)
+
+headAngle = 90
 
 import smbus
 import sys
 import time
 import curses
+
+#import RPi.GPIO as GPIO
+#GPIO.setmode(GPIO.BOARD)
+#GPIO.setup(11,GPIO.OUT)
+
+#pwm=GPIO.PWM(11,50)
+#pwm.start(5)
+
+#_duty = 1/18*(180) + 2
+#pwm.ChangeDutyCycle(_duty)
 
 # for RPI version 1, use "bus = smbus.SMBus(0)"
 bus = smbus.SMBus(1)
@@ -20,7 +46,7 @@ sys.path.append(roboclaw_path)
 sys.path.append(spacebrew_path)
 
 import roboclaw
-from pySpacebrew.spacebrew import Spacebrew
+#from pySpacebrew.spacebrew import Spacebrew
 
 stdscr = curses.initscr()
 curses.cbreak()
@@ -32,6 +58,84 @@ _targetMotor = array('i',[0,0])
 
 _moveType = 0
 _running = True
+
+moving = False
+
+# CHANGE SERVER TO CORRECT
+socketIO = SocketIO('192.168.1.143', 5000, LoggingNamespace)
+
+# MOTOR VALUES
+_speedAlpha = 5
+
+def writeToArduino(val):
+
+  for character in str(val):
+    print character
+    bus.write_byte(address, ord(character))
+
+  return -1
+
+######################
+# Get control from socket
+########################
+def getStick1(*args):
+ 
+  global moving 
+  _v = "3" + str(args[0])
+
+  print _v
+  print int(_v)
+ 
+  _v = "3021" 
+  if moving == False:
+    moving = True
+    writeToArduino(_v)
+    time.sleep(1)
+
+def getStick2(*args):
+  
+  _v = "1" + str(args[0])
+  writeNumber(_v)
+
+def getUp(*args):
+
+  print "UP"
+
+  _speedAlpha = 5
+  initDir(0)
+  addSpeed(0,_speedAlpha)
+  addSpeed(1,_speedAlpha)
+  
+def getDown(*args):
+
+  _speedAlpha = 5
+  print "DOWN"
+
+  initDir(0)
+  addSpeed(0,-_speedAlpha)
+  addSpeed(1,-_speedAlpha)
+  
+def getLeft(*args):
+
+  initDir(1)
+  addSpeed(0,-_speedAlpha)
+  addSpeed(1,_speedAlpha)
+  
+def getRight(*args):
+  
+  initDir(1)
+  addSpeed(0,_speedAlpha)
+  addSpeed(1,-_speedAlpha)
+
+def getTrayUp(*args):
+  
+  _v = "1001"
+  writeNumber(_v)
+
+def getTrayDown(*args):
+  
+  _v = "1002"
+  writeNumber(_v)
 
 def initDir(_tMoveType):
   
@@ -63,8 +167,9 @@ def main(stdscr):
 
   global _targetMotor
   global _moveType
+  global headAngle
 
-  _speedAlpha = 5
+  print "testing here"
 
   _k = ''
   _motor0 = 0;
@@ -76,10 +181,37 @@ def main(stdscr):
   stdscr.nodelay(1)
 
   while True:
+  
+    #Listen to the Socket
+    socketIO.on('stick1', getStick1) 
+    socketIO.on('stick2', getStick2) 
+    socketIO.on('buttonUp', getUp) 
+    socketIO.on('buttonDown', getDown) 
+    socketIO.on('buttonLeft', getLeft) 
+    socketIO.on('buttonRight', getRight) 
+    socketIO.on('buttonTrayUp', getTrayUp) 
+    socketIO.on('buttonTrayDown', getTrayDown) 
+
+    #socketIO.wait()
 	
+    duty = float(headAngle) / 10.0 + 2.5
+    pwm.ChangeDutyCycle(duty)
+
     _k = stdscr.getch()
     if _k != -1:
       print(str(_k))
+
+      if _k == ord('w'):
+        
+        headAngle += 3
+        if headAngle > 180:
+           headAngle = 180
+
+      if _k == ord('e'):
+        
+        headAngle -= 3
+        if headAngle < 0:
+           headAngle = 0
 
       if _k == ord('i'):
 
@@ -114,28 +246,20 @@ def main(stdscr):
 
 
 # get app name and server from query string
-name = "Lab Robot - Test Controls"
-_server = "192.168.1.143"; #sandbox.spacebrew.cc"
-
-# configure the spacebrew client
-brew = Spacebrew(name, server=_server)
-
-brew.addSubscriber("motorA", "range")
-brew.addSubscriber("motorB", "range")
 
 MOTOR_MIN = 0
 MOTOR_MAX = 70
 
-ENABLE_MOTORS = False
+ENABLE_MOTORS = True
 
 #
 # Write To Arduino
 #
-def writeToArduino(val):
+def writeToArduino(_val):
 
-  for character in str(val):
+  for character in str(_val):
     print character
-    bus.write_byte(address, ord(character))
+    #bus.write_byte(address, ord(character))
 
   return -1
 
@@ -149,14 +273,14 @@ def motor1(_val):
 	global _targetMotor
 
 	_targetMotor[0] = mapValues(int(_val), 0, 1023, -MOTOR_MAX, MOTOR_MAX)
-        print "t: " + str(_targetMotor[0])
+        #print "t: " + str(_targetMotor[0])
 
 def motor2(_val):
 
 	global _targetMotor
 
 	_targetMotor[1] = mapValues(int(_val), 0, 1023, -MOTOR_MAX, MOTOR_MAX)
-        print "t: " + str(_targetMotor[1])
+        #print "t: " + str(_targetMotor[1])
 
 # Map Values
 def mapValues(in_val, in_from, in_to, out_from, out_to):
@@ -172,8 +296,8 @@ def mapValues(in_val, in_from, in_to, out_from, out_to):
     return out_val
 
 # registering range handler method with appropriate subscription feed
-brew.subscribe("motorB", motor2)
-brew.subscribe("motorA", motor1)
+#brew.subscribe("motorB", motor2)
+#brew.subscribe("motorA", motor1)
 
 #Linux comport name
 if ENABLE_MOTORS == True:
@@ -229,7 +353,7 @@ def setMotors():
 
 			time.sleep(.03)
 
-	print ">" + str(_valMotor[0]) + " " + str(_valMotor[1])
+	#print ">" + str(_valMotor[0]) + " " + str(_valMotor[1])
 
 if __name__ == '__main__':
 	curses.wrapper(main)
