@@ -1,5 +1,6 @@
 from socketIO_client import SocketIO, LoggingNamespace
 
+import asyncio
 import sys
 import time
 import curses
@@ -15,19 +16,22 @@ sys.path.append(spacebrew_path)
 #import roboclaw
 #from pySpacebrew.spacebrew import Spacebrew
 
-stdscr = curses.initscr()
-curses.cbreak()
-stdscr.keypad(1)
-stdscr.refresh()
+#stdscr = curses.initscr()
+#curses.cbreak()
+#stdscr.keypad(1)
+#stdscr.refresh()
 
 _valMotor = array('i',[0,0])
 _targetMotor = array('i',[0,0])
 
 _moveType = 0
 _running = True
+_speedAlpha = 5
 
 # CHANGE SERVER TO CORRECT
-socketIO = SocketIO('192.168.8.102', 5000, LoggingNamespace)
+
+#Adam Home
+socketIO = SocketIO('192.168.8.101', 5000, LoggingNamespace)
 
 def writeNumber(value):
     bus.write_byte(address, value)
@@ -41,8 +45,7 @@ def getStick1(*args):
   
   _v = "3" + str(args[0])
 
-  print _v
-  print int(_v)
+  print(_v)
   writeNumber(int(_v))
 
 def getStick2(*args):
@@ -52,11 +55,15 @@ def getStick2(*args):
 
 def getUp(*args):
 
+  print("Up")
+
   initDir(0)
   addSpeed(0,_speedAlpha)
   addSpeed(1,_speedAlpha)
   
 def getDown(*args):
+
+  print("Down")
 
   initDir(0)
   addSpeed(0,-_speedAlpha)
@@ -109,82 +116,72 @@ def addSpeed(_i, _s):
 
   _targetMotor[_i] = int(_t)
 
+_k = ''
+_motor0 = 0;
+_motor1 = 0;
 
-def main(stdscr):
+_keySpeed = 0.0
+_keyTurn = 0.0
 
-  global _targetMotor
-  global _moveType
 
-  _speedAlpha = 5
+#################
+# SOCKET LOOP
+#################
+@asyncio.coroutine
+def socketLoop():
+  socketIO.wait(.1)
+  asyncio.async(socketLoop())
 
-  _k = ''
-  _motor0 = 0;
-  _motor1 = 0;
 
-  _keySpeed = 0.0
-  _keyTurn = 0.0
+##################
+# Set Motor Loops
+#################
+@asyncio.coroutine
+def motorLoop():
 
-  stdscr.nodelay(1)
+  _k = -1; #stdscr.getch()
+  if _k != -1:
+    print(str(_k))
 
-  #Listen to the Socket
-  socketIO.on('stick1', getStick1) 
-  socketIO.on('stick2', getStick2) 
-  socketIO.on('buttonUp', getUp) 
-  socketIO.on('buttonDown', getDown) 
-  socketIO.on('buttonLeft', getLeft) 
-  socketIO.on('buttonRight', getRight) 
-  socketIO.on('buttonTrayUp', getTrayUp) 
-  socketIO.on('buttonTrayDown', getTrayDown) 
+    if _k == ord('i'):
 
-  socketIO.wait()
+      initDir(0)
 
-  while True:
-	
-    _k = stdscr.getch()
-    if _k != -1:
-      print(str(_k))
+      addSpeed(0,_speedAlpha)
+      addSpeed(1,_speedAlpha)
 
-      if _k == ord('i'):
+    if _k == ord('k'):
 
-	initDir(0)
+      initDir(0)
 
-        addSpeed(0,_speedAlpha)
-        addSpeed(1,_speedAlpha)
+      addSpeed(0,-_speedAlpha)
+      addSpeed(1,-_speedAlpha)
 
-      if _k == ord('k'):
+    if _k == ord('l'):
 
-	initDir(0)
+      initDir(1)
 
-        addSpeed(0,-_speedAlpha)
-        addSpeed(1,-_speedAlpha)
+      addSpeed(0,_speedAlpha)
+      addSpeed(1,-_speedAlpha)
 
-      if _k == ord('l'):
+    if _k == ord('j'):
 
-	initDir(1)
+      initDir(1)
 
-        addSpeed(0,_speedAlpha)
-        addSpeed(1,-_speedAlpha)
+      addSpeed(0,-_speedAlpha)
+      addSpeed(1,_speedAlpha)
 
-      if _k == ord('j'):
+  #print str(_targetMotor[0]) + ' ' + str(_targetMotor[1])
+  setMotors()
 
-	initDir(1)
-
-        addSpeed(0,-_speedAlpha)
-        addSpeed(1,_speedAlpha)
-
-    #print str(_targetMotor[0]) + ' ' + str(_targetMotor[1])
-    setMotors()
+  asyncio.async(motorLoop())
 
 
 # get app name and server from query string
 name = "Lab Robot - Test Controls"
-_server = "192.168.1.143"; #sandbox.spacebrew.cc"
+#_server = "192.168.1.143"; #sandbox.spacebrew.cc"
 
 # configure the spacebrew client
-#brew = Spacebrew(name, server=_server)
-
-#brew.addSubscriber("motorA", "range")
-#brew.addSubscriber("motorB", "range")
 
 MOTOR_MIN = 0
 MOTOR_MAX = 70
@@ -199,17 +196,17 @@ ENABLE_MOTORS = False
 # function that handles the incoming spacebrew range messages
 def motor1(_val):
 
-	global _targetMotor
+  global _targetMotor
 
-	_targetMotor[0] = mapValues(int(_val), 0, 1023, -MOTOR_MAX, MOTOR_MAX)
-        print "t: " + str(_targetMotor[0])
+  _targetMotor[0] = mapValues(int(_val), 0, 1023, -MOTOR_MAX, MOTOR_MAX)
+  print("t: " + str(_targetMotor[0]))
 
 def motor2(_val):
 
-	global _targetMotor
+  global _targetMotor
 
-	_targetMotor[1] = mapValues(int(_val), 0, 1023, -MOTOR_MAX, MOTOR_MAX)
-        print "t: " + str(_targetMotor[1])
+  _targetMotor[1] = mapValues(int(_val), 0, 1023, -MOTOR_MAX, MOTOR_MAX)
+  print("t: " + str(_targetMotor[1]))
 
 # Map Values
 def mapValues(in_val, in_from, in_to, out_from, out_to):
@@ -224,13 +221,6 @@ def mapValues(in_val, in_from, in_to, out_from, out_to):
 
     return out_val
 
-# registering range handler method with appropriate subscription feed
-#brew.subscribe("motorB", motor2)
-#brew.subscribe("motorA", motor1)
-
-#Linux comport name
-if ENABLE_MOTORS == True:
-    roboclaw.Open("/dev/ttyACM0",115200)
 
 address = 0x80
 _val = 0
@@ -240,16 +230,6 @@ _stage = 0
 
 IS_KEYBOARD = True
 IS_SOCKETS = False
-
-if IS_SOCKETS == True:
-
-	try:
-		brew.start()
-	finally:
-		brew.stop()
-
-#Set data
-#def setSpeed():
 
 def setMotors():
 
@@ -267,7 +247,6 @@ def setMotors():
 			else:
 				_valMotor[i] = _valMotor[i] - _alpha	
 
-
 			if ENABLE_MOTORS == True: 
 				if i == 0:
 					if _valMotor[i] > 0:
@@ -282,10 +261,37 @@ def setMotors():
 
 			time.sleep(.03)
 
-	print ">" + str(_valMotor[0]) + " " + str(_valMotor[1])
+	#print ">" + str(_valMotor[0]) + " " + str(_valMotor[1])
 
-if __name__ == '__main__':
-	curses.wrapper(main)
+#
+# BEGIN HERE
+# 
+loop = asyncio.get_event_loop()
 
-curses.endwin()
+try:
+
+  #Linux comport name
+  if ENABLE_MOTORS == True:
+    roboclaw.Open("/dev/ttyACM0",115200)
+
+  #Listen to the Socket
+  socketIO.on('stick1', getStick1) 
+  socketIO.on('stick2', getStick2) 
+  socketIO.on('buttonUp', getUp) 
+  socketIO.on('buttonDown', getDown) 
+  socketIO.on('buttonLeft', getLeft) 
+  socketIO.on('buttonRight', getRight) 
+  socketIO.on('buttonTrayUp', getTrayUp) 
+  socketIO.on('buttonTrayDown', getTrayDown) 
+ 
+  asyncio.async(socketLoop())
+  asyncio.async(motorLoop())
+
+  loop.run_forever()
+ 
+except KeyboardInterrupt:
+  pass
+
+finally:
+  loop.close()
 
